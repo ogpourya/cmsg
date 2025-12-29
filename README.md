@@ -5,7 +5,7 @@ A command-line tool to easily edit any git commit message, including past commit
 ## Installation
 
 ```bash
-cd /tmp && git clone https://github.com/ogpourya/cmsg.git && uv tool install cmsg/
+uv tool install https://github.com/ogpourya/cmsg.git
 ```
 
 ## Usage
