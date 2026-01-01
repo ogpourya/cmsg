@@ -18,12 +18,12 @@ def run_command(command, check=True, capture_output=True, env=None):
         return result
     except subprocess.CalledProcessError as e:
         if check:
-            print(f"💥 Error running command: {e.cmd}")
+            print(f"[!] Error running command: {e.cmd}")
             if e.stdout:
-                print(f"📤 Stdout:\n{e.stdout}")
+                print(f"[-] Stdout:\n{e.stdout}")
             if e.stderr:
-                print(f"📥 Stderr:\n{e.stderr}")
-            print("❌ Exiting with failure.")
+                print(f"[-] Stderr:\n{e.stderr}")
+            print("[x] Exiting with failure.")
             sys.exit(1)
         else:
             raise
@@ -33,9 +33,9 @@ def is_working_directory_clean():
     result = run_command(["git", "status", "--porcelain"])
     clean = not result.stdout.strip()
     if not clean:
-        print("⚠️  Working directory not clean. Please commit or stash changes before continuing.")
+        print("[!] Working directory not clean. Please commit or stash changes before continuing.")
     else:
-        print("✨ Working directory is clean. Good to go.")
+        print("[+] Working directory is clean. Good to go.")
     return clean
 
 def get_full_hash(commit_id):
@@ -43,10 +43,10 @@ def get_full_hash(commit_id):
     try:
         result = run_command(["git", "rev-parse", commit_id])
         full = result.stdout.strip()
-        print(f"🔎 Resolved '{commit_id}' to {full[:7]}")
+        print(f"[*] Resolved '{commit_id}' to {full[:7]}")
         return full
     except subprocess.CalledProcessError:
-        print(f"🚫 Could not resolve commit ID '{commit_id}'. Please check the id and try again.")
+        print(f"[x] Could not resolve commit ID '{commit_id}'. Please check the id and try again.")
         sys.exit(1)
 
 def is_head(commit_hash):
@@ -54,9 +54,9 @@ def is_head(commit_hash):
     head_hash = get_full_hash("HEAD")
     match = commit_hash == head_hash
     if match:
-        print(f"📍 Target {commit_hash[:7]} is HEAD.")
+        print(f"[*] Target {commit_hash[:7]} is HEAD.")
     else:
-        print(f"📍 Target {commit_hash[:7]} is not HEAD.")
+        print(f"[*] Target {commit_hash[:7]} is not HEAD.")
     return match
 
 def get_parent_hash(commit_hash):
@@ -64,20 +64,20 @@ def get_parent_hash(commit_hash):
     try:
         result = run_command(["git", "rev-parse", f"{commit_hash}^"], check=False)
         if result.returncode != 0:
-            print("🌱 This is a root commit - no parent found.")
+            print("[*] This is a root commit - no parent found.")
             return None
         parent = result.stdout.strip()
-        print(f"↩️  Parent commit is {parent[:7]}")
+        print(f"[*] Parent commit is {parent[:7]}")
         return parent
     except Exception:
-        print("⚠️  Could not determine parent commit.")
+        print("[!] Could not determine parent commit.")
         return None
 
 def internal_sequence_editor():
     """Logic for GIT_SEQUENCE_EDITOR."""
     target_hash = os.environ.get("CMSG_TARGET_HASH")
     if not target_hash:
-        print("🚫 Environment error: CMSG_TARGET_HASH not set in sequence editor.")
+        print("[x] Environment error: CMSG_TARGET_HASH not set in sequence editor.")
         sys.exit(1)
 
     todo_file = sys.argv[1]
@@ -107,7 +107,7 @@ def internal_sequence_editor():
                 new_line = line.replace("pick", "reword", 1)
                 new_lines.append(new_line)
                 found = True
-                print(f"✏️  Marked {current_short_hash} for reword (target matched).")
+                print(f"[*] Marked {current_short_hash} for reword (target matched).")
             else:
                 new_lines.append(line)
         else:
@@ -117,19 +117,19 @@ def internal_sequence_editor():
         f.writelines(new_lines)
     
     if not found:
-        print("ℹ️  Commit not found in todo list. Letting git handle the sequence file.")
+        print("[i] Commit not found in todo list. Letting git handle the sequence file.")
 
 def internal_message_editor():
     """Logic for GIT_EDITOR when -m is provided."""
     new_message = os.environ.get("CMSG_NEW_MESSAGE")
     if new_message is None:
-        print("🚫 Environment error: CMSG_NEW_MESSAGE not set in message editor.")
+        print("[x] Environment error: CMSG_NEW_MESSAGE not set in message editor.")
         sys.exit(1)
     
     msg_file = sys.argv[1]
     with open(msg_file, "w") as f:
         f.write(new_message)
-    print("✍️  Wrote new commit message into the temporary editor file.")
+    print("[+] Wrote new commit message into the temporary editor file.")
 
 def main():
     # Handle internal recursive calls
@@ -151,7 +151,7 @@ def main():
 
     # 1. Check clean working directory
     if not is_working_directory_clean():
-        print("🚫 Please commit or stash changes and try again. Progress 0%.")
+        print("[x] Please commit or stash changes and try again. Progress 0%.")
         sys.exit(1)
 
     # 2. Resolve target commit
@@ -172,7 +172,7 @@ def main():
         else:
              run_command(git_cmd)
         
-        print(f"✅ Successfully edited commit {target_full_hash[:7]}. Done 100%.")
+        print(f"[+] Successfully edited commit {target_full_hash[:7]}. Done 100%.")
         return
 
     # 5. Target is not HEAD (Rebase required)
@@ -182,10 +182,10 @@ def main():
     rebase_cmd = ["git", "rebase", "-i"]
     if parent_hash:
         rebase_cmd.append(parent_hash)
-        print(f"🔧 Preparing interactive rebase onto parent {parent_hash[:7]}")
+        print(f"[*] Preparing interactive rebase onto parent {parent_hash[:7]}")
     else:
         rebase_cmd.append("--root")
-        print("🔧 Preparing interactive rebase from root commit")
+        print("[*] Preparing interactive rebase from root commit")
 
     env = os.environ.copy()
     
@@ -198,15 +198,15 @@ def main():
     if new_message is not None:
         env["GIT_EDITOR"] = f"{shlex.quote(python_exe)} {shlex.quote(script_path)} --internal-message-editor"
         env["CMSG_NEW_MESSAGE"] = new_message
-        print("📝 Will set the new commit message non interactively.")
+        print("[*] Will set the new commit message non interactively.")
     else:
-        print("📝 No -m provided. Git will open your default editor to edit the commit message.")
+        print("[*] No -m provided. Git will open your default editor to edit the commit message.")
 
     try:
         subprocess.run(rebase_cmd, env=env, check=True)
-        print(f"✅ Successfully edited commit {target_full_hash[:7]}. Rebase finished 100%.")
+        print(f"[+] Successfully edited commit {target_full_hash[:7]}. Rebase finished 100%.")
     except subprocess.CalledProcessError:
-        print("❌ Error during rebase. Please resolve conflicts or run 'git rebase --abort' and try again.")
+        print("[x] Error during rebase. Please resolve conflicts or run 'git rebase --abort' and try again.")
         sys.exit(1)
 
 if __name__ == "__main__":
